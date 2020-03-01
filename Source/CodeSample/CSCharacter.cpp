@@ -24,18 +24,19 @@ void ACSCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 //Inputs below are meant to test different requests from client.
 void ACSCharacter::RunInput(bool bStartRunning)
 {
-	FRun Run = FRun(bStartRunning);
-	Server_RequestAction(Run.SerializeRequestData(this));
+	TUniquePtr<FRun> Run = MakeUnique<FRun>(bStartRunning);
+	Server_RequestAction(Run->SerializeRequestData(this));
 }
 void ACSCharacter::JumpInput()
 {
-	FJump Jump = FJump();
-	Server_RequestAction(Jump.SerializeRequestData(this));
+	TUniquePtr<FJump> Jump = MakeUnique<FJump>();
+	Server_RequestAction(Jump->SerializeRequestData(this));
 }
 void ACSCharacter::Suicide()
 {
-	FAttack Attack = FAttack(this);
-	Server_RequestAction(Attack.SerializeRequestData(this));
+	//Use this to simulate an attack against himself, only for demo
+	TUniquePtr<FAttack> Attack = MakeUnique<FAttack>(this);
+	Server_RequestAction(Attack->SerializeRequestData(this));
 }
 #pragma endregion
 
@@ -58,7 +59,7 @@ void ACSCharacter::Server_RequestAction_Implementation(const FActionRequest& Req
 	}
 
 	bool bShouldMulticast = false;
-	const FActionRequest RequestActionCopy = FActionRequest(RequestAction);
+	const TSharedRef<FActionRequest> RequestActionCopy = MakeShared<FActionRequest>(RequestAction);
 
 	if (RequestAction.IsSameType(NAME_Jump))
 	{
@@ -66,8 +67,8 @@ void ACSCharacter::Server_RequestAction_Implementation(const FActionRequest& Req
 	}
 	else if (RequestAction.IsSameType(NAME_Run))
 	{
-		const FRun Run = FRun(RequestAction, this);
-		if (Run.bStartRunning)
+		const TUniquePtr<FRun> Run = MakeUnique<FRun>(RequestAction, this);
+		if (Run->bStartRunning)
 		{
 			//Verify if player has enough stamina to execute this request
 			if (StaminaPercent > 0)
@@ -86,10 +87,10 @@ void ACSCharacter::Server_RequestAction_Implementation(const FActionRequest& Req
 	}
 	else if (RequestAction.IsSameType(NAME_Attack))
 	{
-		const FAttack Attack = FAttack(RequestAction, this);
+		const TUniquePtr<FAttack> Attack = MakeUnique<FAttack>(RequestAction, this);
 
 		//Prevent player to hurt himself
-		if (ensureMsgf(Attack.Enemy != this, TEXT("Character %s try to hurt himself"), *Attack.Enemy->GetActorLabel()))
+		if (ensureMsgf(Attack->Enemy != this, TEXT("Character %s try to hurt himself"), *Attack->Enemy->GetActorLabel()))
 		{
 			bShouldMulticast = true;
 		}
@@ -98,7 +99,7 @@ void ACSCharacter::Server_RequestAction_Implementation(const FActionRequest& Req
 	if (bShouldMulticast)
 	{
 		//Some successful requests need to be multicasted to provide feedback(fx, animations...)
-		Multicast_ActionResult(RequestActionCopy);
+		Multicast_ActionResult(RequestActionCopy.Get());
 	}
 }
 
@@ -119,6 +120,8 @@ void ACSCharacter::Multicast_ActionResult_Implementation(const FActionRequest& R
 	}
 	else if (RequestAction.IsSameType(NAME_Run))
 	{
+		const TUniquePtr<FRun> Run = MakeUnique<FRun>(RequestAction, this);
+		UE_LOG(LogTemp, Log, TEXT("%s running"), Run->bStartRunning ? TEXT("Start") : TEXT("End"));
 		//Could be use to change animation state and spawn fx animations		
 	}
 	else if (RequestAction.IsSameType(NAME_Attack))
