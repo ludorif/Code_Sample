@@ -1,7 +1,6 @@
 // Copyright (C) Ludovic Riffiod 2020. All Rights Reserved.
 #include "ActionRequestData.h"
-#include "Request/ActionRequest.h"
-#include "Engine/NetConnection.h"
+#include "ActionRequest.h"
 
 FActionRequestData::FActionRequestData(const FName NewRequestType)
 {
